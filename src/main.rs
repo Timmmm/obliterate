@@ -90,7 +90,8 @@ fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
         }
     };
     let mut permissions = metadata.permissions();
-    if permissions.readonly() {
+
+    if !is_writable(&permissions) {
         // Set parent directory as writable.
         set_writable(&mut permissions);
         match fs::set_permissions(containing_directory, permissions) {
@@ -119,6 +120,20 @@ fn set_writable(permissions: &mut fs::Permissions) {
 #[cfg(not(unix))]
 fn set_writable(permissions: &mut fs::Permissions) {
     permissions.set_readonly(false);
+}
+
+#[cfg(unix)]
+fn is_writable(permissions: &fs::Permissions) -> bool {
+    use std::os::unix::prelude::PermissionsExt;
+    // The default `readonly()` checks for write bits on any of the user/group/other
+    // parts. That doesn't work because a) we might not be in the group, and
+    // b) you need user write permissions to delete a file. Group/other aren't enough.
+    permissions.mode() & 0o200 != 0
+}
+
+#[cfg(not(unix))]
+fn is_writable(permissions: &fs::Permissions) -> bool {
+    !permissions.readonly()
 }
 
 #[cfg(test)]
