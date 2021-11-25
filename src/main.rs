@@ -34,18 +34,18 @@ fn remove_path(path: &Path) -> Result<()> {
                     entry.path(),
                     if entry.file_type().is_dir() { FileOrDir::Dir } else { FileOrDir::File },
                 ) {
-                    eprintln!("Error removing {:?}: {:?}", entry.path(), e);
+                    eprintln!("Error removing {}: {}", entry.path().display(), e);
                     success = false;
                 }
             }
             Err(e) => {
-                eprintln!("Access error: {:?}", e);
+                eprintln!("Access error: {}", e);
                 success = false;
             }
         }
     }
     if !success {
-        bail!("One or more errors deleting {:?}", path);
+        bail!("One or more errors deleting {}", path.display());
     }
     Ok(())
 }
@@ -72,7 +72,7 @@ fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
     let metadata = match path.metadata() {
         Ok(m) => m,
         Err(e) => {
-            bail!("Permission denied reading {} and error when reading its metadata: {:?}", item_name, e);
+            bail!("Permission denied reading {} and error when reading its metadata: {}", item_name, e);
         }
     };
     let mut permissions = metadata.permissions();
@@ -82,7 +82,7 @@ fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
         match fs::set_permissions(path, permissions) {
             Err(e) => {
                 // Give up.
-                bail!("Error setting {} to be writable: {:?}", item_name, e);
+                bail!("Error setting {} to be writable: {}", item_name, e);
             }
             Ok(_) => {}
         }
@@ -106,7 +106,7 @@ fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
     let metadata = match containing_directory.metadata() {
         Ok(m) => m,
         Err(e) => {
-            bail!("Permission denied deleting {}, additionally there was this error when reading its parent directory's metadata: {:?}", item_name, e);
+            bail!("Permission denied deleting {}, additionally there was this error when reading its parent directory's metadata: {}", item_name, e);
         }
     };
     let mut permissions = metadata.permissions();
@@ -116,7 +116,7 @@ fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
         match fs::set_permissions(containing_directory, permissions) {
             Err(e) => {
                 // Give up.
-                bail!("Error setting parent directory to be writable: {:?}", e);
+                bail!("Error setting parent directory to be writable: {}", e);
             }
             Ok(_) => {}
         }
