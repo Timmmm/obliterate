@@ -1,5 +1,6 @@
 use anyhow::{Result, bail};
 use std::fs;
+use std::os::unix::prelude::PermissionsExt;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use walkdir::WalkDir;
@@ -68,34 +69,8 @@ fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
         Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {},
         Err(e) => return Err(e.into()),
     }
-    // Permission denied. Check the permission on the entry.
-    let metadata = match path.metadata() {
-        Ok(m) => m,
-        Err(e) => {
-            bail!("Permission denied reading {} and error when reading its metadata: {}", item_name, e);
-        }
-    };
-    let mut permissions = metadata.permissions();
-    if permissions.readonly() {
-        // Set it as writable.
-        permissions.set_readonly(false);
-        match fs::set_permissions(path, permissions) {
-            Err(e) => {
-                // Give up.
-                bail!("Error setting {} to be writable: {}", item_name, e);
-            }
-            Ok(_) => {}
-        }
-        // Try deleting it again.
-        match remove_item(path) {
-            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {},
-            Err(e) => return Err(e.into()),
-            Ok(_) => return Ok(()),
-        }
-    }
 
-    // File was either readable or it has been set to be readable successfully.
-    // Check the containing directory permissions.
+    // Permission denied. Check the permission on the parent directory.
     let containing_directory = match path.parent() {
         Some(p) => p,
         None => {
@@ -112,7 +87,7 @@ fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
     let mut permissions = metadata.permissions();
     if permissions.readonly() {
         // Set parent directory as writable.
-        permissions.set_readonly(false);
+        set_writable(&mut permissions);
         match fs::set_permissions(containing_directory, permissions) {
             Err(e) => {
                 // Give up.
@@ -124,8 +99,22 @@ fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
         return Ok(remove_item(path)?);
     }
     // File and parent directory are writable but we still got permission denied.
-    bail!("Permission denied");
+    bail!("Permission denied even though parent directory is writable");
 }
+
+#[cfg(unix)]
+fn set_writable(permissions: &mut fs::Permissions) {
+    // The default `set_readonly()` weirdly sets it on the "all" part, which
+    // means if the delete fails we leave files writable by everyone. Probably
+    // not what was intended. Set the mode on the "user" part explicitly instead.
+    permissions.set_mode(permissions.mode() | 0o200);
+}
+
+#[cfg(not(unix))]
+fn set_writable(permissions: &mut fs::Permissions) {
+    permissions.set_readonly(false);
+}
+
 
 #[cfg(test)]
 mod test {
@@ -160,6 +149,7 @@ mod test {
         let file_path = path.join("dir1/dir2/file1");
         let mut permissions = file_path.metadata().unwrap().permissions();
         permissions.set_readonly(true);
+        // TODO: set_permissions is weird; it changes the `all` permission not `user`.
         fs::set_permissions(file_path, permissions).unwrap();
 
         remove_path(&path.join("dir1")).unwrap();
