@@ -18,14 +18,14 @@ jobs:
         include:
           - os: ubuntu-18.04
             cargo_extra_flags: --target x86_64-unknown-linux-musl
-            output_executable: target/x86_64-unknown-linux-musl/release/autorebase
-            output_executable_upload_as: autorebase-linux
+            output_executable: target/x86_64-unknown-linux-musl/release/obliterate
+            output_executable_upload_as: obliterate-linux
           - os: macos-latest
-            output_executable: target/release/autorebase
-            output_executable_upload_as: autorebase-mac
+            output_executable: target/release/obliterate
+            output_executable_upload_as: obliterate-mac
           - os: windows-latest
-            output_executable: target/release/autorebase.exe
-            output_executable_upload_as: autorebase-windows.exe
+            output_executable: target/release/obliterate.exe
+            output_executable_upload_as: obliterate-windows.exe
     steps:
       - uses: actions/checkout@v2
 
