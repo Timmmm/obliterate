@@ -1,6 +1,5 @@
 use anyhow::{bail, Result};
 use std::fs;
-use std::os::unix::prelude::PermissionsExt;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 use walkdir::WalkDir;
@@ -110,6 +109,7 @@ fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
 
 #[cfg(unix)]
 fn set_writable(permissions: &mut fs::Permissions) {
+    use std::os::unix::prelude::PermissionsExt;
     // The default `set_readonly()` weirdly sets it on the "all" part, which
     // means if the delete fails we leave files writable by everyone. Probably
     // not what was intended. Set the mode on the "user" part explicitly instead.
