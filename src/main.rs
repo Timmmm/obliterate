@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use std::fs;
 use std::os::unix::prelude::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -6,7 +6,10 @@ use structopt::StructOpt;
 use walkdir::WalkDir;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "obliterate", about = "Remove a directory tree even if some files or directories are read-only.")]
+#[structopt(
+    name = "obliterate",
+    about = "Remove a directory tree even if some files or directories are read-only."
+)]
 struct Opt {
     paths: Vec<PathBuf>,
 }
@@ -33,7 +36,11 @@ fn remove_path(path: &Path) -> Result<()> {
             Ok(entry) => {
                 if let Err(e) = remove_file_or_dir(
                     entry.path(),
-                    if entry.file_type().is_dir() { FileOrDir::Dir } else { FileOrDir::File },
+                    if entry.file_type().is_dir() {
+                        FileOrDir::Dir
+                    } else {
+                        FileOrDir::File
+                    },
                 ) {
                     eprintln!("Error removing {}: {}", entry.path().display(), e);
                     success = false;
@@ -52,7 +59,6 @@ fn remove_path(path: &Path) -> Result<()> {
 }
 
 fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
-
     let remove_item = match file_or_dir {
         FileOrDir::File => fs::remove_file,
         FileOrDir::Dir => fs::remove_dir,
@@ -66,7 +72,7 @@ fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
     // Try to delete it.
     match remove_item(path) {
         Ok(_) => return Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {},
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {}
         Err(e) => return Err(e.into()),
     }
 
@@ -114,7 +120,6 @@ fn set_writable(permissions: &mut fs::Permissions) {
 fn set_writable(permissions: &mut fs::Permissions) {
     permissions.set_readonly(false);
 }
-
 
 #[cfg(test)]
 mod test {
@@ -187,12 +192,7 @@ mod test {
         fs::write(path.join("dir1/file1"), "hello").unwrap();
         fs::write(path.join("dir1/dir2/file1"), "world").unwrap();
 
-        for p in [
-            "dir1",
-            "dir1/dir2",
-            "dir1/file1",
-            "dir1/dir2/file1",
-        ] {
+        for p in ["dir1", "dir1/dir2", "dir1/file1", "dir1/dir2/file1"] {
             let file_path = path.join(p);
             let mut permissions = file_path.metadata().unwrap().permissions();
             permissions.set_readonly(true);
