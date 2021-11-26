@@ -146,10 +146,7 @@ fn path_to_make_writable(path: &Path, _file_or_dir: FileOrDir) -> Option<&Path> 
 
 #[cfg(not(unix))]
 fn path_to_make_writable(path: &Path, file_or_dir: FileOrDir) -> Option<&Path> {
-    match file_or_dir {
-        FileOrDir::File => Some(path),
-        FileOrDir::Dir => None,
-    }
+    Some(path)
 }
 
 #[cfg(test)]
