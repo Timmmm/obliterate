@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
@@ -75,15 +75,18 @@ fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
         Err(e) => return Err(e.into()),
     }
 
-    // Permission denied. Check the permission on the parent directory.
-    let containing_directory = match path.parent() {
-        Some(p) => p,
-        None => {
-            // No parent. It must be the root.
-            bail!("Permission denied deleting {} in root directory", item_name);
-        }
-    };
-    let metadata = match containing_directory.metadata() {
+    // Permission denied. Check if it's a permission we can grant. On Unix
+    // we need to do `chmod u+w` on the parent directory. On Windows we need
+    // to clear the read only attribute on the file itself. If it's a directory
+    // on Windows you can always delete it. See FILE_ATTRIBUTE_READONLY here
+    // https://docs.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants and
+    // https://support.microsoft.com/en-gb/topic/you-cannot-view-or-change-the-read-only-or-the-system-attributes-of-folders-in-windows-server-2003-in-windows-xp-in-windows-vista-or-in-windows-7-55bd5ec5-d19e-6173-0df1-8f5b49247165
+    // Note that Windows also has a proper ACL system but we don't try to
+    // use it.
+
+    let permission_target = path_to_make_writable(path, file_or_dir).ok_or(anyhow!("Permission denied and cannot set writable"))?;
+
+    let metadata = match permission_target.metadata() {
         Ok(m) => m,
         Err(e) => {
             bail!("Permission denied deleting {}, additionally there was this error when reading its parent directory's metadata: {}", item_name, e);
@@ -94,7 +97,7 @@ fn remove_file_or_dir(path: &Path, file_or_dir: FileOrDir) -> Result<()> {
     if !is_writable(&permissions) {
         // Set parent directory as writable.
         set_writable(&mut permissions);
-        match fs::set_permissions(containing_directory, permissions) {
+        match fs::set_permissions(permission_target, permissions) {
             Err(e) => {
                 // Give up.
                 bail!("Error setting parent directory to be writable: {}", e);
@@ -134,6 +137,19 @@ fn is_writable(permissions: &fs::Permissions) -> bool {
 #[cfg(not(unix))]
 fn is_writable(permissions: &fs::Permissions) -> bool {
     !permissions.readonly()
+}
+
+#[cfg(unix)]
+fn path_to_make_writable(path: &Path, _file_or_dir: FileOrDir) -> Option<&Path> {
+    path.parent()
+}
+
+#[cfg(not(unix))]
+fn path_to_make_writable(path: &Path, file_or_dir: FileOrDir) -> Option<&Path> {
+    match file_or_dir {
+        FileOrDir::File => Some(path),
+        FileOrDir::Dir => None,
+    }
 }
 
 #[cfg(test)]
